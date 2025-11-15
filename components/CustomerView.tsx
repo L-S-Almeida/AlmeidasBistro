@@ -68,52 +68,59 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ products, settings, 
     if (!paymentMethod) missingFields.push("Forma de Pagamento");
 
     if (missingFields.length > 0) {
-      setValidationError(`Por favor, preencha os seguintes campos:\n\n${missingFields.join(', ')}`);
-      return;
+        setValidationError(`Por favor, preencha os seguintes campos:\n\n${missingFields.join(', ')}`);
+        return;
     }
 
-    let message = `*NOVO PEDIDO - ${settings.name}*\n\n`;
-    message += `*Cliente:* ${customerName}\n`;
-    message += `*WhatsApp:* ${customerPhone}\n`;
-    message += `*Endereço:* ${address}\n`;
-    
-    if (observation) {
-        message += `*Observação:* ${observation}\n`;
-    }
+    // FECHAR o modal ANTES de abrir o WhatsApp
+    setIsCartOpen(false);
 
-    message += `\n*-------------------------*\n`;
-    message += `*ITENS DO PEDIDO:*\n`;
+    // Pequeno delay para garantir que o modal fechou
+    setTimeout(() => {
+        let message = `*NOVO PEDIDO - ${settings.name}*\n\n`;
+        message += `*Cliente:* ${customerName}\n`;
+        message += `*WhatsApp:* ${customerPhone}\n`;
+        message += `*Endereço:* ${address}\n`;
+        
+        if (observation) {
+            message += `*Observação:* ${observation}\n`;
+        }
 
-    cart.forEach(item => {
-      message += `${item.quantity}x ${item.name} - R$ ${(item.price * item.quantity).toFixed(2)}\n`;
-    });
+        message += `\n*-------------------------*\n`;
+        message += `*ITENS DO PEDIDO:*\n`;
 
-    message += `*-------------------------*\n`;
-    message += `Subtotal: R$ ${cartSubtotal.toFixed(2)}\n`;
-    
-    if (deliveryFee > 0) {
-        message += `Taxa de Entrega: R$ ${deliveryFee.toFixed(2)}\n`;
-    } else {
-        message += `Taxa de Entrega: A calcular\n`;
-    }
-    
-    message += `*TOTAL: R$ ${cartTotal.toFixed(2)}*\n`;
-    message += `*-------------------------*\n`;
-    
-    const paymentLabel = {
-        'pix': 'PIX',
-        'money': 'Dinheiro',
-        'credit': 'Cartão de Crédito',
-        'debit': 'Cartão de Débito'
-    }[paymentMethod] || 'Outro';
+        cart.forEach(item => {
+        message += `${item.quantity}x ${item.name} - R$ ${(item.price * item.quantity).toFixed(2)}\n`;
+        });
 
-    message += `*Forma de Pagamento:* ${paymentLabel}\n`;
+        message += `*-------------------------*\n`;
+        message += `Subtotal: R$ ${cartSubtotal.toFixed(2)}\n`;
+        
+        if (deliveryFee > 0) {
+            message += `Taxa de Entrega: R$ ${deliveryFee.toFixed(2)}\n`;
+        } else {
+            message += `Taxa de Entrega: A calcular\n`;
+        }
+        
+        message += `*TOTAL: R$ ${cartTotal.toFixed(2)}*\n`;
+        message += `*-------------------------*\n`;
+        
+        const paymentLabel = {
+            'pix': 'PIX',
+            'money': 'Dinheiro',
+            'credit': 'Cartão de Crédito',
+            'debit': 'Cartão de Débito'
+        }[paymentMethod] || 'Outro';
 
-    const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = `https://wa.me/${settings.whatsapp.replace(/\D/g, '')}?text=${encodedMessage}`;
-    
-    window.open(whatsappUrl, '_blank');
-  };
+        message += `*Forma de Pagamento:* ${paymentLabel}\n`;
+
+        const encodedMessage = encodeURIComponent(message);
+        const whatsappUrl = `https://wa.me/${settings.whatsapp.replace(/\D/g, '')}?text=${encodedMessage}`;
+        
+        // Abrir WhatsApp - isso funciona no mobile
+        window.location.href = whatsappUrl;
+    }, 300);
+    };
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] font-sans pb-32">
