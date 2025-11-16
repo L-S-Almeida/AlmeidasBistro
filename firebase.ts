@@ -2,6 +2,8 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+// 🆕 1. Importar o Storage
+import { getStorage } from "firebase/storage"; 
 
 // Configurações do seu projeto Firebase usando variáveis de ambiente
 const firebaseConfig = {
@@ -17,14 +19,17 @@ const firebaseConfig = {
 let app = null;
 let auth = null;
 let db = null;
+// 🆕 2. Declarar a variável para o Storage
+let storage = null; 
 
 // Verifica se a configuração existe antes de tentar inicializar
-// Isso previne que o site quebre (tela branca) se o arquivo .env não estiver preenchido
 if (firebaseConfig.apiKey && firebaseConfig.projectId) {
   try {
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
     db = getFirestore(app);
+    // 🆕 3. Inicializar o Storage
+    storage = getStorage(app); 
     console.log("Firebase conectado com sucesso.");
   } catch (error) {
     console.error("Erro ao inicializar Firebase:", error);
@@ -36,4 +41,5 @@ if (firebaseConfig.apiKey && firebaseConfig.projectId) {
   console.warn("O site rodará em modo offline/demo por enquanto.");
 }
 
-export { auth, db };
+// 🆕 4. Exportar o Storage junto com Auth e DB
+export { auth, db, storage };
