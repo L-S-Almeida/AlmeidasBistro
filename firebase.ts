@@ -43,3 +43,4 @@ if (firebaseConfig.apiKey && firebaseConfig.projectId) {
 
 // 🆕 4. Exportar o Storage junto com Auth e DB
 export { auth, db, storage };
+export const storage = getStorage(app);
