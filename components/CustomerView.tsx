@@ -60,67 +60,67 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ products, settings, 
   // --- WhatsApp Integration ---
 
   const handleSendOrder = () => {
-    const missingFields = [];
-    
-    if (!customerName.trim()) missingFields.push("Nome");
-    if (!customerPhone.trim()) missingFields.push("WhatsApp");
-    if (!address.trim()) missingFields.push("Endereço");
-    if (!paymentMethod) missingFields.push("Forma de Pagamento");
+  const missingFields = [];
+  
+  if (!customerName.trim()) missingFields.push("Nome");
+  if (!customerPhone.trim()) missingFields.push("WhatsApp");
+  if (!address.trim()) missingFields.push("Endereço");
+  if (!paymentMethod) missingFields.push("Forma de Pagamento");
 
-    if (missingFields.length > 0) {
-        setValidationError(`Por favor, preencha os seguintes campos:\n\n${missingFields.join(', ')}`);
-        return;
+  if (missingFields.length > 0) {
+    setValidationError(`Por favor, preencha os seguintes campos:\n\n${missingFields.join(', ')}`);
+    return;
+  }
+
+  // FECHAR o modal ANTES de abrir o WhatsApp
+  setIsCartOpen(false);
+
+  // Pequeno delay para garantir que o modal fechou
+  setTimeout(() => {
+    let message = `*NOVO PEDIDO - ${settings.name}*\n\n`;
+    message += `*Cliente:* ${customerName}\n`;
+    message += `*WhatsApp:* ${customerPhone}\n`;
+    message += `*Endereço:* ${address}\n`;
+    
+    if (observation) {
+        message += `*Observação:* ${observation}\n`;
     }
 
-    // FECHAR o modal ANTES de abrir o WhatsApp
-    setIsCartOpen(false);
+    message += `\n*-------------------------*\n`;
+    message += `*ITENS DO PEDIDO:*\n`;
 
-    // Pequeno delay para garantir que o modal fechou
-    setTimeout(() => {
-        let message = `*NOVO PEDIDO - ${settings.name}*\n\n`;
-        message += `*Cliente:* ${customerName}\n`;
-        message += `*WhatsApp:* ${customerPhone}\n`;
-        message += `*Endereço:* ${address}\n`;
-        
-        if (observation) {
-            message += `*Observação:* ${observation}\n`;
-        }
+    cart.forEach(item => {
+      message += `${item.quantity}x ${item.name} - R$ ${(item.price * item.quantity).toFixed(2)}\n`;
+    });
 
-        message += `\n*-------------------------*\n`;
-        message += `*ITENS DO PEDIDO:*\n`;
+    message += `*-------------------------*\n`;
+    message += `Subtotal: R$ ${cartSubtotal.toFixed(2)}\n`;
+    
+    if (deliveryFee > 0) {
+        message += `Taxa de Entrega: R$ ${deliveryFee.toFixed(2)}\n`;
+    } else {
+        message += `Taxa de Entrega: A calcular\n`;
+    }
+    
+    message += `*TOTAL: R$ ${cartTotal.toFixed(2)}*\n`;
+    message += `*-------------------------*\n`;
+    
+    const paymentLabel = {
+        'pix': 'PIX',
+        'money': 'Dinheiro',
+        'credit': 'Cartão de Crédito',
+        'debit': 'Cartão de Débito'
+    }[paymentMethod] || 'Outro';
 
-        cart.forEach(item => {
-        message += `${item.quantity}x ${item.name} - R$ ${(item.price * item.quantity).toFixed(2)}\n`;
-        });
+    message += `*Forma de Pagamento:* ${paymentLabel}\n`;
 
-        message += `*-------------------------*\n`;
-        message += `Subtotal: R$ ${cartSubtotal.toFixed(2)}\n`;
-        
-        if (deliveryFee > 0) {
-            message += `Taxa de Entrega: R$ ${deliveryFee.toFixed(2)}\n`;
-        } else {
-            message += `Taxa de Entrega: A calcular\n`;
-        }
-        
-        message += `*TOTAL: R$ ${cartTotal.toFixed(2)}*\n`;
-        message += `*-------------------------*\n`;
-        
-        const paymentLabel = {
-            'pix': 'PIX',
-            'money': 'Dinheiro',
-            'credit': 'Cartão de Crédito',
-            'debit': 'Cartão de Débito'
-        }[paymentMethod] || 'Outro';
-
-        message += `*Forma de Pagamento:* ${paymentLabel}\n`;
-
-        const encodedMessage = encodeURIComponent(message);
-        const whatsappUrl = `https://wa.me/${settings.whatsapp.replace(/\D/g, '')}?text=${encodedMessage}`;
-        
-        // Abrir WhatsApp - isso funciona no mobile
-        window.location.href = whatsappUrl;
-    }, 300);
-    };
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/${settings.whatsapp.replace(/\D/g, '')}?text=${encodedMessage}`;
+    
+    // Abrir WhatsApp - isso funciona no mobile
+    window.location.href = whatsappUrl;
+  }, 300);
+};
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] font-sans pb-32">
@@ -173,41 +173,44 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ products, settings, 
       <div className="max-w-3xl mx-auto px-4 space-y-6">
         {products.length === 0 ? (
             <div className="text-center py-12 text-gray-400 flex flex-col items-center bg-white rounded-2xl shadow-sm border border-gray-100 mx-4">
-                <Search size={48} className="mb-4 opacity-20" />
-                <p className="font-medium">Nenhum item disponível no momento.</p>
+            <Search size={48} className="mb-4 opacity-20" />
+            <p className="font-medium">Nenhum item disponível no momento.</p>
             </div>
         ) : (
             <div className="grid gap-4">
-            {products.map(product => (
+            {/* ORDENAR produtos pelo campo 'order' */}
+            {products
+                .sort((a, b) => a.order - b.order) // ← ADICIONE ESTA LINHA
+                .map(product => (
                 <div key={product.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex gap-4 items-start hover:shadow-md transition-all duration-300 group animate-in fade-in slide-in-from-bottom-2">
                 
                 {/* Foto */}
                 <div className="w-24 h-24 bg-gray-50 rounded-xl flex-shrink-0 overflow-hidden relative">
                     <img 
-                        src={product.image} 
-                        alt={product.name} 
-                        className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
-                        onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/eee/999?text=Foto'; }}
+                    src={product.image} 
+                    alt={product.name} 
+                    className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
+                    onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/eee/999?text=Foto'; }}
                     />
                 </div>
 
-                {/* Informações */}
+                {/* Resto do código permanece igual */}
                 <div className="flex-grow min-w-0 flex flex-col justify-between min-h-[6rem]">
                     <div>
-                        <h3 className="font-bold text-gray-800 text-lg mb-1 leading-tight">{product.name}</h3>
-                        <p className="text-gray-500 text-sm line-clamp-2 mb-2 leading-relaxed">{product.description}</p>
+                    <h3 className="font-bold text-gray-800 text-lg mb-1 leading-tight">{product.name}</h3>
+                    <p className="text-gray-500 text-sm line-clamp-2 mb-2 leading-relaxed">{product.description}</p>
                     </div>
                     
                     <div className="flex justify-between items-center mt-auto">
-                        <span className="font-black text-lg text-[#D93F3E]">R$ {Number(product.price).toFixed(2).replace('.', ',')}</span>
-                        <button 
-                            onClick={() => addToCart(product)}
-                            disabled={!settings.isOpen}
-                            className={`w-10 h-10 flex items-center justify-center rounded-full shadow-md transition-all active:scale-90
-                                ${settings.isOpen ? 'bg-gray-900 text-white hover:bg-[#D93F3E]' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
-                        >
-                            <Plus size={20} />
-                        </button>
+                    <span className="font-black text-lg text-[#D93F3E]">R$ {Number(product.price).toFixed(2).replace('.', ',')}</span>
+                    <button 
+                        onClick={() => addToCart(product)}
+                        disabled={!settings.isOpen}
+                        className={`w-10 h-10 flex items-center justify-center rounded-full shadow-md transition-all active:scale-90
+                        ${settings.isOpen ? 'bg-gray-900 text-white hover:bg-[#D93F3E]' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+                    >
+                        <Plus size={20} />
+                    </button>
                     </div>
                 </div>
                 </div>
