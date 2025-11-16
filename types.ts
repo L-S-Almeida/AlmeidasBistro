@@ -1,19 +1,19 @@
 export interface Product {
   id: string;
   name: string;
-  price: number;
   description: string;
+  price: number;
   image: string;
-  category?: string;
+  order: number;
 }
 
 export interface StoreSettings {
   name: string;
-  whatsapp: string;
   isOpen: boolean;
-  logoUrl: string;
-  bannerUrl: string; // For the "Seu pedido chega quentinho" section
+  whatsapp: string;
   bannerMessage: string;
+  logoUrl?: string;
+  bannerUrl?: string;
   deliveryFee: number;
 }
 
@@ -22,3 +22,4 @@ export interface CartItem extends Product {
 }
 
 export type ViewState = 'CUSTOMER' | 'ADMIN_LOGIN' | 'ADMIN_DASHBOARD';
+export type PaymentMethod = 'pix' | 'money' | 'credit' | 'debit';
