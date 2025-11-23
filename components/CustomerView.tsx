@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Product, StoreSettings, CartItem } from '../types';
-import { ShoppingBag, Plus, Minus, Trash2, X, Send, Search, Store, Utensils, Clock, CreditCard, Banknote, Smartphone, MapPin, FileText, AlertCircle, Lock } from 'lucide-react';
+import { ShoppingBag, Plus, Minus, Trash2, X, Send, Search, Store, Utensils, Clock, CreditCard, Banknote, Smartphone, MapPin, FileText, AlertCircle, Lock, Maximize2 } from 'lucide-react';
 
 interface CustomerViewProps {
   products: Product[];
@@ -12,27 +12,59 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ products, settings, 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   
+  // NOVO: Estado para quantidade direto na lista
+  const [productQuantities, setProductQuantities] = useState<{[key: string]: number}>({});
+  
+  // NOVO: Estado para modal de imagem em tela cheia
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
   // Checkout Form State
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [address, setAddress] = useState('');
   const [observation, setObservation] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('pix'); // pix, money, credit, debit
+  const [paymentMethod, setPaymentMethod] = useState('pix');
 
   // Validation Modal State
   const [validationError, setValidationError] = useState<string | null>(null);
 
   // --- Cart Logic ---
 
+  // NOVA FUNÇÃO: Adicionar quantidade direto na lista
+  const updateProductQuantity = (productId: string, delta: number) => {
+    setProductQuantities(prev => {
+      const current = prev[productId] || 0;
+      const newQuantity = Math.max(0, current + delta);
+      
+      if (newQuantity === 0) {
+        const { [productId]: removed, ...rest } = prev;
+        return rest;
+      }
+      
+      return { ...prev, [productId]: newQuantity };
+    });
+  };
+
+  // FUNÇÃO ATUALIZADA: Adicionar ao carrinho considerando quantidade
   const addToCart = (product: Product) => {
+    const quantity = productQuantities[product.id] || 1;
+    
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {
         return prev.map(item => 
-          item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+          item.id === product.id 
+            ? { ...item, quantity: item.quantity + quantity }
+            : item
         );
       }
-      return [...prev, { ...product, quantity: 1 }];
+      return [...prev, { ...product, quantity }];
+    });
+    
+    // Limpa a quantidade após adicionar ao carrinho
+    setProductQuantities(prev => {
+      const { [product.id]: removed, ...rest } = prev;
+      return rest;
     });
   };
 
@@ -60,67 +92,81 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ products, settings, 
   // --- WhatsApp Integration ---
 
   const handleSendOrder = () => {
-  const missingFields = [];
-  
-  if (!customerName.trim()) missingFields.push("Nome");
-  if (!customerPhone.trim()) missingFields.push("WhatsApp");
-  if (!address.trim()) missingFields.push("Endereço");
-  if (!paymentMethod) missingFields.push("Forma de Pagamento");
-
-  if (missingFields.length > 0) {
-    setValidationError(`Por favor, preencha os seguintes campos:\n\n${missingFields.join(', ')}`);
-    return;
-  }
-
-  // FECHAR o modal ANTES de abrir o WhatsApp
-  setIsCartOpen(false);
-
-  // Pequeno delay para garantir que o modal fechou
-  setTimeout(() => {
-    let message = `*NOVO PEDIDO - ${settings.name}*\n\n`;
-    message += `*Cliente:* ${customerName}\n`;
-    message += `*WhatsApp:* ${customerPhone}\n`;
-    message += `*Endereço:* ${address}\n`;
+    const missingFields = [];
     
-    if (observation) {
-        message += `*Observação:* ${observation}\n`;
+    if (!customerName.trim()) missingFields.push("Nome");
+    if (!customerPhone.trim()) missingFields.push("WhatsApp");
+    if (!address.trim()) missingFields.push("Endereço");
+    if (!paymentMethod) missingFields.push("Forma de Pagamento");
+
+    if (missingFields.length > 0) {
+      setValidationError(`Por favor, preencha os seguintes campos:\n\n${missingFields.join(', ')}`);
+      return;
     }
 
-    message += `\n*-------------------------*\n`;
-    message += `*ITENS DO PEDIDO:*\n`;
+    setIsCartOpen(false);
 
-    cart.forEach(item => {
-      message += `${item.quantity}x ${item.name} - R$ ${(item.price * item.quantity).toFixed(2)}\n`;
-    });
+    setTimeout(() => {
+      let message = `*NOVO PEDIDO - ${settings.name}*\n\n`;
+      message += `*Cliente:* ${customerName}\n`;
+      message += `*WhatsApp:* ${customerPhone}\n`;
+      message += `*Endereço:* ${address}\n`;
+      
+      if (observation) {
+          message += `*Observação:* ${observation}\n`;
+      }
 
-    message += `*-------------------------*\n`;
-    message += `Subtotal: R$ ${cartSubtotal.toFixed(2)}\n`;
-    
-    if (deliveryFee > 0) {
-        message += `Taxa de Entrega: R$ ${deliveryFee.toFixed(2)}\n`;
-    } else {
-        message += `Taxa de Entrega: A calcular\n`;
-    }
-    
-    message += `*TOTAL: R$ ${cartTotal.toFixed(2)}*\n`;
-    message += `*-------------------------*\n`;
-    
-    const paymentLabel = {
-        'pix': 'PIX',
-        'money': 'Dinheiro',
-        'credit': 'Cartão de Crédito',
-        'debit': 'Cartão de Débito'
-    }[paymentMethod] || 'Outro';
+      message += `\n*-------------------------*\n`;
+      message += `*ITENS DO PEDIDO:*\n`;
 
-    message += `*Forma de Pagamento:* ${paymentLabel}\n`;
+      cart.forEach(item => {
+        message += `${item.quantity}x ${item.name} - R$ ${(item.price * item.quantity).toFixed(2)}\n`;
+      });
 
-    const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = `https://wa.me/${settings.whatsapp.replace(/\D/g, '')}?text=${encodedMessage}`;
-    
-    // Abrir WhatsApp - isso funciona no mobile
-    window.location.href = whatsappUrl;
-  }, 300);
-};
+      message += `*-------------------------*\n`;
+      message += `Subtotal: R$ ${cartSubtotal.toFixed(2)}\n`;
+      
+      if (deliveryFee > 0) {
+          message += `Taxa de Entrega: R$ ${deliveryFee.toFixed(2)}\n`;
+      } else {
+          message += `Taxa de Entrega: A calcular\n`;
+      }
+      
+      message += `*TOTAL: R$ ${cartTotal.toFixed(2)}*\n`;
+      message += `*-------------------------*\n`;
+      
+      const paymentLabel = {
+          'pix': 'PIX',
+          'money': 'Dinheiro',
+          'credit': 'Cartão de Crédito',
+          'debit': 'Cartão de Débito'
+      }[paymentMethod] || 'Outro';
+
+      message += `*Forma de Pagamento:* ${paymentLabel}\n`;
+
+      const encodedMessage = encodeURIComponent(message);
+      const whatsappUrl = `https://wa.me/${settings.whatsapp.replace(/\D/g, '')}?text=${encodedMessage}`;
+      
+      window.location.href = whatsappUrl;
+    }, 300);
+  };
+
+  // NOVA FUNÇÃO: Gerar iniciais para fallback
+  const getProductInitials = (productName: string): string => {
+    const words = productName.split(' ');
+    if (words.length === 1) return words[0].charAt(0).toUpperCase();
+    return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase();
+  };
+
+  // NOVA FUNÇÃO: Gerar cor baseada no nome do produto
+  const getProductColor = (productName: string): string => {
+    const colors = [
+      'bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500',
+      'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500'
+    ];
+    const index = productName.length % colors.length;
+    return colors[index];
+  };
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] font-sans pb-32">
@@ -169,7 +215,7 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ products, settings, 
         </div>
       </div>
 
-      {/* LISTA DE PRODUTOS */}
+      {/* LISTA DE PRODUTOS - ATUALIZADA COM BOTÕES DE QUANTIDADE */}
       <div className="max-w-3xl mx-auto px-4 space-y-6">
         {products.length === 0 ? (
             <div className="text-center py-12 text-gray-400 flex flex-col items-center bg-white rounded-2xl shadow-sm border border-gray-100 mx-4">
@@ -178,43 +224,89 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ products, settings, 
             </div>
         ) : (
             <div className="grid gap-4">
-            {/* ORDENAR produtos pelo campo 'order' */}
             {products
-                .sort((a, b) => a.order - b.order) // ← ADICIONE ESTA LINHA
-                .map(product => (
-                <div key={product.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex gap-4 items-start hover:shadow-md transition-all duration-300 group animate-in fade-in slide-in-from-bottom-2">
-                
-                {/* Foto */}
-                <div className="w-24 h-24 bg-gray-50 rounded-xl flex-shrink-0 overflow-hidden relative">
-                    <img 
-                    src={product.image} 
-                    alt={product.name} 
-                    className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
-                    onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/eee/999?text=Foto'; }}
-                    />
-                </div>
-
-                {/* Resto do código permanece igual */}
-                <div className="flex-grow min-w-0 flex flex-col justify-between min-h-[6rem]">
-                    <div>
-                    <h3 className="font-bold text-gray-800 text-lg mb-1 leading-tight">{product.name}</h3>
-                    <p className="text-gray-500 text-sm line-clamp-2 mb-2 leading-relaxed">{product.description}</p>
-                    </div>
+                .sort((a, b) => a.order - b.order)
+                .map(product => {
+                  const quantity = productQuantities[product.id] || 0;
+                  
+                  return (
+                    <div key={product.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex gap-4 items-start hover:shadow-md transition-all duration-300 group animate-in fade-in slide-in-from-bottom-2">
                     
-                    <div className="flex justify-between items-center mt-auto">
-                    <span className="font-black text-lg text-[#D93F3E]">R$ {Number(product.price).toFixed(2).replace('.', ',')}</span>
-                    <button 
-                        onClick={() => addToCart(product)}
-                        disabled={!settings.isOpen}
-                        className={`w-10 h-10 flex items-center justify-center rounded-full shadow-md transition-all active:scale-90
-                        ${settings.isOpen ? 'bg-gray-900 text-white hover:bg-[#D93F3E]' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+                    {/* Foto - AGORA CLICÁVEL */}
+                    <div 
+                      className="w-24 h-24 bg-gray-50 rounded-xl flex-shrink-0 overflow-hidden relative cursor-pointer"
+                      onClick={() => setSelectedImage(product.image)}
                     >
-                        <Plus size={20} />
-                    </button>
+                      <img 
+                        src={product.image} 
+                        alt={product.name} 
+                        className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
+                        onError={(e) => { 
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                        }}
+                      />
+                      {/* FALLBACK COM INICIAIS */}
+                      <div 
+                        className={`absolute inset-0 flex items-center justify-center ${getProductColor(product.name)} text-white font-bold text-lg rounded-xl`}
+                        style={{ display: product.image ? 'none' : 'flex' }}
+                      >
+                        {getProductInitials(product.name)}
+                      </div>
+                      {/* ÍCONE DE AMPLIAR */}
+                      <div className="absolute top-1 right-1 bg-black/50 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Maximize2 size={12} />
+                      </div>
                     </div>
-                </div>
-                </div>
-            ))}
+
+                    <div className="flex-grow min-w-0 flex flex-col justify-between min-h-[6rem]">
+                      <div>
+                        <h3 className="font-bold text-gray-800 text-lg mb-1 leading-tight">{product.name}</h3>
+                        <p className="text-gray-500 text-sm line-clamp-2 mb-2 leading-relaxed">{product.description}</p>
+                      </div>
+                      
+                      <div className="flex justify-between items-center mt-auto">
+                        <span className="font-black text-lg text-[#D93F3E]">R$ {Number(product.price).toFixed(2).replace('.', ',')}</span>
+                        
+                        {/* BOTÕES DE QUANTIDADE - NOVOS */}
+                        <div className="flex items-center gap-2">
+                          {quantity > 0 && (
+                            <div className="flex items-center bg-gray-100 rounded-lg p-1">
+                              <button 
+                                onClick={() => updateProductQuantity(product.id, -1)}
+                                disabled={!settings.isOpen}
+                                className="w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-white hover:shadow-sm rounded-md transition disabled:opacity-50"
+                              >
+                                {quantity === 1 ? <Trash2 size={14}/> : <Minus size={14}/>}
+                              </button>
+                              <span className="text-sm font-bold w-6 text-center">{quantity}</span>
+                              <button 
+                                onClick={() => updateProductQuantity(product.id, 1)}
+                                disabled={!settings.isOpen}
+                                className="w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-white hover:shadow-sm rounded-md transition disabled:opacity-50"
+                              >
+                                <Plus size={14}/>
+                              </button>
+                            </div>
+                          )}
+                          
+                          <button 
+                            onClick={() => quantity > 0 ? addToCart(product) : updateProductQuantity(product.id, 1)}
+                            disabled={!settings.isOpen}
+                            className={`w-10 h-10 flex items-center justify-center rounded-full shadow-md transition-all active:scale-90
+                              ${settings.isOpen 
+                                ? quantity > 0 
+                                  ? 'bg-[#D93F3E] text-white hover:bg-red-700' 
+                                  : 'bg-gray-900 text-white hover:bg-[#D93F3E]'
+                                : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+                          >
+                            {quantity > 0 ? <ShoppingBag size={16} /> : <Plus size={20} />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )})}
             </div>
         )}
       </div>
@@ -253,7 +345,7 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ products, settings, 
         </div>
       )}
 
-      {/* MODAL DO CARRINHO (Checkout) */}
+      {/* MODAL DO CARRINHO (Checkout) - MANTIDO IGUAL */}
       {isCartOpen && (
         <div className="fixed inset-0 bg-black/60 z-50 flex justify-end backdrop-blur-sm">
             <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
@@ -283,7 +375,23 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ products, settings, 
                                 {cart.map(item => (
                                     <div key={item.id} className="flex gap-4 items-center bg-white border border-gray-100 p-3 rounded-xl shadow-sm">
                                         <div className="w-16 h-16 bg-gray-50 rounded-lg overflow-hidden flex-shrink-0">
-                                            <img src={item.image} className="w-full h-full object-cover" alt="" onError={(e) => (e.target as HTMLImageElement).src='https://placehold.co/100'}/>
+                                            <img 
+                                              src={item.image} 
+                                              className="w-full h-full object-cover" 
+                                              alt={item.name}
+                                              onError={(e) => {
+                                                const target = e.target as HTMLImageElement;
+                                                target.style.display = 'none';
+                                                // Fallback será aplicado via CSS
+                                              }}
+                                            />
+                                            {/* Fallback para itens do carrinho */}
+                                            <div 
+                                              className={`w-full h-full flex items-center justify-center ${getProductColor(item.name)} text-white font-bold text-sm`}
+                                              style={{ display: item.image ? 'none' : 'flex' }}
+                                            >
+                                              {getProductInitials(item.name)}
+                                            </div>
                                         </div>
                                         <div className="flex-grow min-w-0">
                                             <h4 className="font-bold text-gray-800 text-sm line-clamp-1">{item.name}</h4>
@@ -427,6 +535,29 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ products, settings, 
                     </div>
                 )}
             </div>
+        </div>
+      )}
+
+      {/* NOVO MODAL: IMAGEM EM TELA CHEIA */}
+      {selectedImage && (
+        <div 
+          className="fixed inset-0 bg-black/90 z-[70] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setSelectedImage(null)}
+        >
+          <div className="relative max-w-4xl max-h-full">
+            <button 
+              className="absolute -top-12 right-0 text-white hover:text-gray-300 transition z-10"
+              onClick={() => setSelectedImage(null)}
+            >
+              <X size={32} />
+            </button>
+            <img 
+              src={selectedImage} 
+              alt="Visualização ampliada" 
+              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
         </div>
       )}
 
