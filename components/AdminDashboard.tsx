@@ -3,7 +3,7 @@ import { Product, StoreSettings } from '../types';
 import { 
   LogOut, Plus, Edit3, Trash2, Settings, Store, 
   GripVertical, Save, X, Upload, ArrowUpDown, Image,
-  Power, Check, XCircle, ZoomIn, ZoomOut, Move
+  Power, Check, XCircle
 } from 'lucide-react';
 import {
   DndContext,
@@ -23,7 +23,7 @@ import {
 } from '@dnd-kit/sortable';
 import {CSS} from '@dnd-kit/utilities';
 
-// Componente Sortable para os produtos - SIMPLIFICADO
+// Componente Sortable para os produtos
 const SortableProductItem = ({ 
   product, 
   onEdit, 
@@ -63,7 +63,7 @@ const SortableProductItem = ({
         <GripVertical size={20} />
       </div>
 
-      {/* Foto do Produto - SIMPLIFICADA */}
+      {/* Foto do Produto */}
       <div className="w-20 h-20 bg-gray-50 rounded-xl flex-shrink-0 overflow-hidden relative group/img">
         <img 
           src={product.image} 
@@ -126,17 +126,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   
-  // Estados SIMPLIFICADOS para o formulário de produto
+  // Estados para o formulário de produto
   const [productForm, setProductForm] = useState({
     name: '',
     description: '',
     price: '',
-    imageUrl: '' // ← AGORA: campo único para URL da imagem
+    imageUrl: ''
   });
 
   const [settingsForm, setSettingsForm] = useState(settings);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoFileInputRef = useRef<HTMLInputElement>(null);
+  const productImageInputRef = useRef<HTMLInputElement>(null);
 
   // Sensors para drag and drop
   const sensors = useSensors(
@@ -145,6 +146,76 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+
+  // FUNÇÃO SIMPLIFICADA: Converter imagem para Base64
+  const convertImageToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = (event) => {
+        // Versão SIMPLES - sem redimensionamento
+        resolve(event.target?.result as string);
+      };
+      
+      reader.onerror = () => reject(new Error('Erro ao ler arquivo'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // FUNÇÃO: Upload de imagem para produto - CORRIGIDA
+  const handleProductImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validar se é imagem
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor, selecione apenas imagens!');
+      return;
+    }
+
+    try {
+      console.log('Processando imagem:', file.name, file.size);
+      const base64Image = await convertImageToBase64(file);
+      console.log('Imagem convertida para Base64');
+      
+      // Atualizar o formulário com a imagem em Base64
+      setProductForm(prev => ({ 
+        ...prev, 
+        imageUrl: base64Image 
+      }));
+      
+    } catch (error) {
+      console.error('Erro ao processar imagem:', error);
+      alert('Erro ao carregar imagem. Tente novamente.');
+    }
+  };
+
+  // FUNÇÃO: Upload de logo - CORRIGIDA
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor, selecione apenas imagens!');
+      return;
+    }
+
+    try {
+      const base64Image = await convertImageToBase64(file);
+      
+      // Atualizar settings com a nova logo em Base64
+      setSettingsForm(prev => ({ 
+        ...prev, 
+        logoUrl: base64Image 
+      }));
+      
+      alert('Logo carregada com sucesso! Clique em "Salvar Configurações" para aplicar.');
+      
+    } catch (error) {
+      console.error('Erro ao processar logo:', error);
+      alert('Erro ao carregar logo. Tente novamente.');
+    }
+  };
 
   // Ordenar produtos pela ordem
   const sortedProducts = [...products].sort((a, b) => a.order - b.order);
@@ -173,7 +244,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     onUpdateSettings(newSettings);
   };
 
-  // FUNÇÃO: Converter link do Drive para URL de imagem (MANTIDA como helper)
+  // FUNÇÃO: Converter link do Drive para URL de imagem
   const convertDriveUrl = (driveUrl: string): string => {
     if (!driveUrl || driveUrl.trim() === '') return '';
     
@@ -195,64 +266,78 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  // FUNÇÃO SIMPLIFICADA: Carregar imagem do Drive
+  // FUNÇÃO: Carregar imagem do Drive
   const handleLoadImage = () => {
-    if (!productForm.imageUrl.trim()) return;
+    if (!productForm.imageUrl.trim()) {
+      alert('Por favor, cole um link do Google Drive primeiro.');
+      return;
+    }
     
     const convertedUrl = convertDriveUrl(productForm.imageUrl);
     setProductForm(prev => ({ ...prev, imageUrl: convertedUrl }));
+    alert('Link convertido! Agora você pode salvar o produto.');
   };
 
-  // FUNÇÃO SIMPLIFICADA: Adicionar produto
+  // FUNÇÃO: Adicionar produto - CORRIGIDA (não requer imagem)
   const handleAddProduct = () => {
-    if (!productForm.name || !productForm.price || !productForm.imageUrl) return;
+    if (!productForm.name || !productForm.price) {
+      alert('Por favor, preencha pelo menos o nome e preço do produto.');
+      return;
+    }
 
     const newProduct: Omit<Product, 'id'> = {
       name: productForm.name,
       description: productForm.description,
       price: parseFloat(productForm.price),
-      image: productForm.imageUrl, // ← AGORA: string simples
+      image: productForm.imageUrl || 'https://placehold.co/200x200/eee/999?text=Produto',
       order: products.length + 1
     };
 
     onAddProduct(newProduct);
     resetProductForm();
+    alert('Produto adicionado com sucesso!');
   };
 
-  // FUNÇÃO SIMPLIFICADA: Editar produto
+  // FUNÇÃO: Editar produto - CORRIGIDA (não requer imagem)
   const handleEditProduct = () => {
-    if (!editingProduct || !productForm.name || !productForm.price || !productForm.imageUrl) return;
+    if (!editingProduct || !productForm.name || !productForm.price) {
+      alert('Por favor, preencha pelo menos o nome e preço do produto.');
+      return;
+    }
 
     onEditProduct(editingProduct.id, {
       name: productForm.name,
       description: productForm.description,
       price: parseFloat(productForm.price),
-      image: productForm.imageUrl, // ← AGORA: string simples
+      image: productForm.imageUrl || editingProduct.image,
     });
 
     setEditingProduct(null);
     resetProductForm();
+    alert('Produto atualizado com sucesso!');
   };
 
   // FUNÇÃO AUXILIAR: Reset do formulário
   const resetProductForm = () => {
     setProductForm({ name: '', description: '', price: '', imageUrl: '' });
     setIsAddingProduct(false);
+    setEditingProduct(null);
   };
 
-  // FUNÇÃO SIMPLIFICADA: Iniciar edição
+  // FUNÇÃO: Iniciar edição
   const startEdit = (product: Product) => {
     setEditingProduct(product);
     setProductForm({
       name: product.name,
       description: product.description,
       price: product.price.toString(),
-      imageUrl: product.image // ← DIRETO a URL
+      imageUrl: product.image
     });
   };
 
   const handleSaveSettings = () => {
     onUpdateSettings(settingsForm);
+    alert('Configurações salvas com sucesso!');
   };
 
   return (
@@ -497,9 +582,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           src={settingsForm.logoUrl} 
                           alt="Logo" 
                           className="w-full h-full object-cover transition-transform duration-300 hover:scale-110"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/eee/999?text=Logo';
-                          }}
                         />
                       ) : (
                         <div className="text-gray-400 text-center p-4">
@@ -513,15 +595,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <input
                       type="file"
                       ref={logoFileInputRef}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          setSettingsForm({ 
-                            ...settingsForm, 
-                            logoUrl: 'https://placehold.co/200x200/eee/999?text=Logo+Local'
-                          });
-                        }
-                      }}
+                      onChange={handleLogoUpload}
                       accept="image/*"
                       className="hidden"
                     />
@@ -533,7 +607,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       Escolher Logo
                     </button>
                     <p className="text-sm text-gray-500">
-                      Clique para selecionar uma imagem do seu computador
+                      Clique para selecionar uma imagem do seu computador ou celular
                     </p>
                   </div>
                 </div>
@@ -551,7 +625,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         )}
       </div>
 
-      {/* Modal Add/Edit Product - SIMPLIFICADO */}
+      {/* Modal Add/Edit Product - CORRIGIDO */}
       {(isAddingProduct || editingProduct) && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -602,13 +676,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  URL da Imagem *
+                  Imagem do Produto (Opcional)
                 </label>
 
-                {/* Input de URL do Google Drive ou qualquer URL */}
+                {/* Upload direto de imagem */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    🔗 Link da Imagem (Google Drive ou qualquer URL)
+                    📷 Upload Direto (Recomendado)
+                  </label>
+                  <input
+                    type="file"
+                    ref={productImageInputRef}
+                    onChange={handleProductImageUpload}
+                    accept="image/*"
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => productImageInputRef.current?.click()}
+                    className="w-full bg-[#D93F3E] text-white px-6 py-3 rounded-lg font-bold hover:bg-red-700 transition flex items-center justify-center gap-2 mb-2"
+                  >
+                    <Upload size={18} />
+                    Escolher Imagem do Computador/Celular
+                  </button>
+                  <p className="text-xs text-gray-500 text-center">
+                    Clique para selecionar uma imagem do seu dispositivo
+                  </p>
+                </div>
+
+                {/* Link do Google Drive */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    🔗 Ou use Link do Google Drive
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -616,25 +714,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       value={productForm.imageUrl}
                       onChange={(e) => setProductForm({...productForm, imageUrl: e.target.value})}
                       className="flex-1 p-3 border border-gray-300 rounded-lg focus:border-[#D93F3E] focus:ring-2 focus:ring-red-100"
-                      placeholder="https://drive.google.com/file/d/... ou https://exemplo.com/imagem.jpg"
+                      placeholder="https://drive.google.com/file/d/..."
                     />
                     <button
                       onClick={handleLoadImage}
-                      disabled={!productForm.imageUrl.trim()}
-                      className="px-4 py-3 bg-[#D93F3E] text-white rounded-lg font-bold hover:bg-red-700 transition disabled:bg-gray-300 disabled:cursor-not-allowed"
+                      className="px-4 py-3 bg-gray-600 text-white rounded-lg font-bold hover:bg-gray-700 transition"
                     >
                       Converter
                     </button>
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    Cole o link do Google Drive e clique em "Converter" ou use qualquer URL de imagem
+                    Cole o link do Google Drive e clique em "Converter"
                   </p>
                 </div>
 
-                {/* Preview Simples da Imagem */}
+                {/* Preview da Imagem - SÓ SE TIVER IMAGEM */}
                 {productForm.imageUrl && (
                   <div className="bg-gray-50 rounded-xl p-4 border-2 border-dashed border-gray-300">
-                    <h4 className="font-medium text-gray-700 mb-3">Preview da Imagem</h4>
+                    <h4 className="font-medium text-gray-700 mb-3">✅ Preview da Imagem</h4>
                     <div className="w-full h-48 bg-white rounded-lg overflow-hidden border border-gray-200 flex items-center justify-center">
                       <img 
                         src={productForm.imageUrl} 
@@ -645,6 +742,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         }}
                       />
                     </div>
+                    <p className="text-xs text-green-600 mt-2">
+                      {productForm.imageUrl.startsWith('data:image') 
+                        ? '📸 Imagem carregada do seu dispositivo' 
+                        : '🔗 Imagem carregada por link'}
+                    </p>
                   </div>
                 )}
               </div>
@@ -653,7 +755,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="flex gap-3 mt-6">
               <button
                 onClick={editingProduct ? handleEditProduct : handleAddProduct}
-                disabled={!productForm.name || !productForm.price || !productForm.imageUrl}
+                disabled={!productForm.name || !productForm.price} // SÓ NOME E PREÇO SÃO OBRIGATÓRIOS
                 className="flex-1 bg-[#D93F3E] text-white py-3 rounded-lg font-bold hover:bg-red-700 transition disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
                 {editingProduct ? 'Salvar Alterações' : 'Adicionar Produto'}
@@ -665,6 +767,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <X size={20} />
               </button>
             </div>
+
+            <p className="text-xs text-gray-500 mt-4 text-center">
+              * Campos obrigatórios: Nome e Preço. A imagem é opcional.
+            </p>
           </div>
         </div>
       )}

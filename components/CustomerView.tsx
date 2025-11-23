@@ -12,10 +12,10 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ products, settings, 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   
-  // NOVO: Estado para quantidade direto na lista
+  // Estado para quantidade direto na lista
   const [productQuantities, setProductQuantities] = useState<{[key: string]: number}>({});
   
-  // NOVO: Estado para modal de imagem em tela cheia
+  // Estado para modal de imagem em tela cheia
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   // Checkout Form State
@@ -151,14 +151,14 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ products, settings, 
     }, 300);
   };
 
-  // NOVA FUNÇÃO: Gerar iniciais para fallback
+  // FUNÇÃO: Gerar iniciais para fallback
   const getProductInitials = (productName: string): string => {
     const words = productName.split(' ');
     if (words.length === 1) return words[0].charAt(0).toUpperCase();
     return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase();
   };
 
-  // NOVA FUNÇÃO: Gerar cor baseada no nome do produto
+  // FUNÇÃO: Gerar cor baseada no nome do produto
   const getProductColor = (productName: string): string => {
     const colors = [
       'bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500',
@@ -166,6 +166,16 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ products, settings, 
     ];
     const index = productName.length % colors.length;
     return colors[index];
+  };
+
+  // NOVA FUNÇÃO: Verificar se imagem é válida (Base64 ou URL normal)
+  const isValidImage = (url: string): boolean => {
+    if (!url) return false;
+    // Se é Base64 (upload direto)
+    if (url.startsWith('data:image/')) return true;
+    // Se é URL normal (Google Drive ou outro)
+    if (url.startsWith('http')) return true;
+    return false;
   };
 
   return (
@@ -232,7 +242,7 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ products, settings, 
                   return (
                     <div key={product.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex gap-4 items-start hover:shadow-md transition-all duration-300 group animate-in fade-in slide-in-from-bottom-2">
                     
-                    {/* Foto - AGORA CLICÁVEL */}
+                    {/* Foto - AGORA CLICÁVEL E COMPATÍVEL COM BASE64 */}
                     <div 
                       className="w-24 h-24 bg-gray-50 rounded-xl flex-shrink-0 overflow-hidden relative cursor-pointer"
                       onClick={() => setSelectedImage(product.image)}
@@ -246,10 +256,10 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ products, settings, 
                           target.style.display = 'none';
                         }}
                       />
-                      {/* FALLBACK COM INICIAIS */}
+                      {/* FALLBACK MELHORADO - Só aparece se imagem não for válida */}
                       <div 
                         className={`absolute inset-0 flex items-center justify-center ${getProductColor(product.name)} text-white font-bold text-lg rounded-xl`}
-                        style={{ display: product.image ? 'none' : 'flex' }}
+                        style={{ display: isValidImage(product.image) ? 'none' : 'flex' }}
                       >
                         {getProductInitials(product.name)}
                       </div>
@@ -268,7 +278,7 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ products, settings, 
                       <div className="flex justify-between items-center mt-auto">
                         <span className="font-black text-lg text-[#D93F3E]">R$ {Number(product.price).toFixed(2).replace('.', ',')}</span>
                         
-                        {/* BOTÕES DE QUANTIDADE - NOVOS */}
+                        {/* BOTÕES DE QUANTIDADE */}
                         <div className="flex items-center gap-2">
                           {quantity > 0 && (
                             <div className="flex items-center bg-gray-100 rounded-lg p-1">
@@ -345,7 +355,7 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ products, settings, 
         </div>
       )}
 
-      {/* MODAL DO CARRINHO (Checkout) - MANTIDO IGUAL */}
+      {/* MODAL DO CARRINHO (Checkout) - ATUALIZADO */}
       {isCartOpen && (
         <div className="fixed inset-0 bg-black/60 z-50 flex justify-end backdrop-blur-sm">
             <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
@@ -382,13 +392,12 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ products, settings, 
                                               onError={(e) => {
                                                 const target = e.target as HTMLImageElement;
                                                 target.style.display = 'none';
-                                                // Fallback será aplicado via CSS
                                               }}
                                             />
-                                            {/* Fallback para itens do carrinho */}
+                                            {/* Fallback MELHORADO para itens do carrinho */}
                                             <div 
                                               className={`w-full h-full flex items-center justify-center ${getProductColor(item.name)} text-white font-bold text-sm`}
-                                              style={{ display: item.image ? 'none' : 'flex' }}
+                                              style={{ display: isValidImage(item.image) ? 'none' : 'flex' }}
                                             >
                                               {getProductInitials(item.name)}
                                             </div>
@@ -538,7 +547,7 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ products, settings, 
         </div>
       )}
 
-      {/* NOVO MODAL: IMAGEM EM TELA CHEIA */}
+      {/* MODAL: IMAGEM EM TELA CHEIA */}
       {selectedImage && (
         <div 
           className="fixed inset-0 bg-black/90 z-[70] flex items-center justify-center p-4 animate-in fade-in duration-200"

@@ -21,11 +21,12 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onCancel
 
     // MODO TESTE (Sem Firebase)
     if (!auth) {
+      console.log("Firebase Auth não configurado - Modo Demo");
       setTimeout(() => {
         if (email === 'admin@almeidasbistro.com' && password === 'admin123') {
-           onLoginSuccess();
+          onLoginSuccess();
         } else {
-           setError('Email ou senha incorretos. Use: admin@almeidasbistro.com / admin123');
+          setError('Email ou senha incorretos. Use: admin@almeidasbistro.com / admin123');
         }
         setIsLoading(false);
       }, 800);
@@ -45,11 +46,13 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onCancel
         msg = 'Email ou senha incorretos.';
       } else if (err.code === 'auth/invalid-email') {
         msg = 'Formato de email inválido.';
+      } else if (err.code === 'auth/network-request-failed') {
+        msg = 'Erro de conexão. Verifique sua internet.';
       }
       
       setError(msg);
     } finally {
-      if (auth) setIsLoading(false);
+      setIsLoading(false);
     }
   };
 
