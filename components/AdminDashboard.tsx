@@ -3,7 +3,7 @@ import { Product, StoreSettings } from '../types';
 import { 
   LogOut, Plus, Edit3, Trash2, Settings, Store, 
   GripVertical, Save, X, Upload, ArrowUpDown, Image,
-  Power, Check, XCircle
+  Power, Check, XCircle, ZoomIn, ZoomOut, Move
 } from 'lucide-react';
 import {
   DndContext,
@@ -23,7 +23,7 @@ import {
 } from '@dnd-kit/sortable';
 import {CSS} from '@dnd-kit/utilities';
 
-// Componente Sortable para os produtos
+// Componente Sortable para os produtos - SIMPLIFICADO
 const SortableProductItem = ({ 
   product, 
   onEdit, 
@@ -63,13 +63,15 @@ const SortableProductItem = ({
         <GripVertical size={20} />
       </div>
 
-      {/* Foto do Produto */}
+      {/* Foto do Produto - SIMPLIFICADA */}
       <div className="w-20 h-20 bg-gray-50 rounded-xl flex-shrink-0 overflow-hidden relative group/img">
         <img 
           src={product.image} 
           alt={product.name}
           className="w-full h-full object-cover transition-transform duration-300 group-hover/img:scale-110"
-          onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/eee/999?text=Produto'; }}
+          onError={(e) => { 
+            (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/eee/999?text=Produto'; 
+          }}
         />
       </div>
 
@@ -124,12 +126,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   
-  // Form states
+  // Estados SIMPLIFICADOS para o formulário de produto
   const [productForm, setProductForm] = useState({
     name: '',
     description: '',
     price: '',
-    image: ''
+    imageUrl: '' // ← AGORA: campo único para URL da imagem
   });
 
   const [settingsForm, setSettingsForm] = useState(settings);
@@ -171,63 +173,81 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     onUpdateSettings(newSettings);
   };
 
-  // Upload de imagem para produto
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      // Em produção, você faria upload para Firebase Storage ou outro serviço
-      // Por enquanto, vamos criar uma URL local para demonstração
-      const imageUrl = URL.createObjectURL(file);
-      setProductForm({ ...productForm, image: imageUrl });
+  // FUNÇÃO: Converter link do Drive para URL de imagem (MANTIDA como helper)
+  const convertDriveUrl = (driveUrl: string): string => {
+    if (!driveUrl || driveUrl.trim() === '') return '';
+    
+    try {
+      const cleanUrl = driveUrl.trim();
+      
+      // Padrão do Google Drive
+      const idMatch = cleanUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      
+      if (idMatch && idMatch[1]) {
+        const fileId = idMatch[1];
+        return `https://drive.google.com/uc?export=view&id=${fileId}`;
+      }
+      
+      return driveUrl;
+      
+    } catch (error) {
+      return driveUrl;
     }
   };
 
-  // Upload de logo
-  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const logoUrl = URL.createObjectURL(file);
-      setSettingsForm({ ...settingsForm, logoUrl });
-    }
+  // FUNÇÃO SIMPLIFICADA: Carregar imagem do Drive
+  const handleLoadImage = () => {
+    if (!productForm.imageUrl.trim()) return;
+    
+    const convertedUrl = convertDriveUrl(productForm.imageUrl);
+    setProductForm(prev => ({ ...prev, imageUrl: convertedUrl }));
   };
 
+  // FUNÇÃO SIMPLIFICADA: Adicionar produto
   const handleAddProduct = () => {
-    if (!productForm.name || !productForm.price) return;
+    if (!productForm.name || !productForm.price || !productForm.imageUrl) return;
 
     const newProduct: Omit<Product, 'id'> = {
       name: productForm.name,
       description: productForm.description,
       price: parseFloat(productForm.price),
-      image: productForm.image || 'https://placehold.co/400x400/eee/999?text=Produto',
+      image: productForm.imageUrl, // ← AGORA: string simples
       order: products.length + 1
     };
 
     onAddProduct(newProduct);
-    setProductForm({ name: '', description: '', price: '', image: '' });
-    setIsAddingProduct(false);
+    resetProductForm();
   };
 
+  // FUNÇÃO SIMPLIFICADA: Editar produto
   const handleEditProduct = () => {
-    if (!editingProduct || !productForm.name || !productForm.price) return;
+    if (!editingProduct || !productForm.name || !productForm.price || !productForm.imageUrl) return;
 
     onEditProduct(editingProduct.id, {
       name: productForm.name,
       description: productForm.description,
       price: parseFloat(productForm.price),
-      image: productForm.image,
+      image: productForm.imageUrl, // ← AGORA: string simples
     });
 
     setEditingProduct(null);
-    setProductForm({ name: '', description: '', price: '', image: '' });
+    resetProductForm();
   };
 
+  // FUNÇÃO AUXILIAR: Reset do formulário
+  const resetProductForm = () => {
+    setProductForm({ name: '', description: '', price: '', imageUrl: '' });
+    setIsAddingProduct(false);
+  };
+
+  // FUNÇÃO SIMPLIFICADA: Iniciar edição
   const startEdit = (product: Product) => {
     setEditingProduct(product);
     setProductForm({
       name: product.name,
       description: product.description,
       price: product.price.toString(),
-      image: product.image,
+      imageUrl: product.image // ← DIRETO a URL
     });
   };
 
@@ -477,6 +497,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           src={settingsForm.logoUrl} 
                           alt="Logo" 
                           className="w-full h-full object-cover transition-transform duration-300 hover:scale-110"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/eee/999?text=Logo';
+                          }}
                         />
                       ) : (
                         <div className="text-gray-400 text-center p-4">
@@ -490,7 +513,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <input
                       type="file"
                       ref={logoFileInputRef}
-                      onChange={handleLogoUpload}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setSettingsForm({ 
+                            ...settingsForm, 
+                            logoUrl: 'https://placehold.co/200x200/eee/999?text=Logo+Local'
+                          });
+                        }
+                      }}
                       accept="image/*"
                       className="hidden"
                     />
@@ -520,10 +551,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         )}
       </div>
 
-      {/* Modal Add/Edit Product com Upload de Imagem */}
+      {/* Modal Add/Edit Product - SIMPLIFICADO */}
       {(isAddingProduct || editingProduct) && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold mb-4">
               {editingProduct ? 'Editar Produto' : 'Adicionar Produto'}
             </h3>
@@ -571,56 +602,64 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Imagem do Produto
+                  URL da Imagem *
                 </label>
-                
-                {/* Preview da Imagem */}
-                {productForm.image && (
-                  <div className="mb-3">
-                    <img 
-                      src={productForm.image} 
-                      alt="Preview" 
-                      className="w-32 h-32 object-cover rounded-lg border border-gray-200"
+
+                {/* Input de URL do Google Drive ou qualquer URL */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    🔗 Link da Imagem (Google Drive ou qualquer URL)
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={productForm.imageUrl}
+                      onChange={(e) => setProductForm({...productForm, imageUrl: e.target.value})}
+                      className="flex-1 p-3 border border-gray-300 rounded-lg focus:border-[#D93F3E] focus:ring-2 focus:ring-red-100"
+                      placeholder="https://drive.google.com/file/d/... ou https://exemplo.com/imagem.jpg"
                     />
+                    <button
+                      onClick={handleLoadImage}
+                      disabled={!productForm.imageUrl.trim()}
+                      className="px-4 py-3 bg-[#D93F3E] text-white rounded-lg font-bold hover:bg-red-700 transition disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                      Converter
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Cole o link do Google Drive e clique em "Converter" ou use qualquer URL de imagem
+                  </p>
+                </div>
+
+                {/* Preview Simples da Imagem */}
+                {productForm.imageUrl && (
+                  <div className="bg-gray-50 rounded-xl p-4 border-2 border-dashed border-gray-300">
+                    <h4 className="font-medium text-gray-700 mb-3">Preview da Imagem</h4>
+                    <div className="w-full h-48 bg-white rounded-lg overflow-hidden border border-gray-200 flex items-center justify-center">
+                      <img 
+                        src={productForm.imageUrl} 
+                        alt="Preview"
+                        className="max-w-full max-h-full object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/eee/999?text=Imagem+Não+Carregada';
+                        }}
+                      />
+                    </div>
                   </div>
                 )}
-                
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleImageUpload}
-                  accept="image/*"
-                  className="hidden"
-                />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-4 text-gray-600 hover:bg-gray-200 transition flex flex-col items-center gap-2"
-                >
-                  <Upload size={24} />
-                  <span>Clique para selecionar imagem</span>
-                  <span className="text-sm text-gray-500">ou arraste e solte</span>
-                </button>
-                
-                <p className="text-sm text-gray-500 mt-2">
-                  A imagem se adaptará automaticamente ao layout
-                </p>
               </div>
             </div>
             
             <div className="flex gap-3 mt-6">
               <button
                 onClick={editingProduct ? handleEditProduct : handleAddProduct}
-                disabled={!productForm.name || !productForm.price}
+                disabled={!productForm.name || !productForm.price || !productForm.imageUrl}
                 className="flex-1 bg-[#D93F3E] text-white py-3 rounded-lg font-bold hover:bg-red-700 transition disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
                 {editingProduct ? 'Salvar Alterações' : 'Adicionar Produto'}
               </button>
               <button
-                onClick={() => {
-                  setIsAddingProduct(false);
-                  setEditingProduct(null);
-                  setProductForm({ name: '', description: '', price: '', image: '' });
-                }}
+                onClick={resetProductForm}
                 className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
               >
                 <X size={20} />
