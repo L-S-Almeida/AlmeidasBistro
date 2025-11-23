@@ -1,9 +1,15 @@
+export interface ProductImage {
+  url: string;
+  zoom: number;
+  position: { x: number; y: number };
+}
+
 export interface Product {
   id: string;
   name: string;
   description: string;
   price: number;
-  image: string;
+  image: ProductImage; // MUDAR de string para ProductImage;
   order: number;
 }
 
