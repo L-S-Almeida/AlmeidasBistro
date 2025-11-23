@@ -108,14 +108,25 @@ const App = () => {
       const unsubscribe = onSnapshot(collection(db, 'menuItems'), (snapshot) => {
           const loadedProducts: Product[] = snapshot.docs.map(doc => {
             const data = doc.data();
-            // CONVERSÃO: garantir que image seja sempre string
+            // CONVERSÃO MELHORADA: garantir compatibilidade com Base64
             return {
               id: doc.id,
               name: data.name || '',
               description: data.description || '',
               price: data.price || 0,
-              image: typeof data.image === 'string' ? data.image : 
-                     (data.image?.url || 'https://placehold.co/200x200/eee/999?text=Produto'),
+              image: (() => {
+                // Se já é string (URL normal ou Base64)
+                if (typeof data.image === 'string') {
+                  // Se é Base64 (começa com data:image) OU URL normal
+                  return data.image;
+                }
+                // Se é objeto (estrutura antiga)
+                if (data.image && typeof data.image === 'object') {
+                  return data.image.url || 'https://placehold.co/200x200/eee/999?text=Produto';
+                }
+                // Fallback
+                return 'https://placehold.co/200x200/eee/999?text=Produto';
+              })(),
               order: data.order || 0
             } as Product;
           });
