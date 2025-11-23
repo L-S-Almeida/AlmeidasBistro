@@ -5,7 +5,7 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { Product, StoreSettings, ViewState } from './types';
 import { DEFAULT_SETTINGS, INITIAL_MENU } from './constants';
 import { auth, db } from './firebase';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, setDoc } from 'firebase/firestore';
 
 const App = () => {
@@ -17,7 +17,6 @@ const App = () => {
   const [settings, setSettings] = useState<StoreSettings>(DEFAULT_SETTINGS);
   
   // Loading States
-  // Inicia true para evitar flash de "Loja Fechada" ou conteúdo vazio
   const [isMenuLoading, setIsMenuLoading] = useState(true);
   const [isSettingsLoading, setIsSettingsLoading] = useState(true);
   
@@ -25,7 +24,7 @@ const App = () => {
   const isLoading = isMenuLoading || isSettingsLoading;
   
   // Auth State
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
 
   // 0. Handle URL Routing (Secret Admin Access)
   useEffect(() => {
@@ -37,20 +36,26 @@ const App = () => {
 
   // 1. Handle Authentication State
   useEffect(() => {
-    if (!auth) return; 
+    if (!auth) {
+      setIsMenuLoading(false);
+      setIsSettingsLoading(false);
+      return;
+    }
 
     try {
       const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-          setUser(currentUser);
-          
-          const path = window.location.pathname.replace(/\/$/, '');
-          if (currentUser && path === '/enterprise_bistro_almeidas_admin') {
-            setCurrentView('ADMIN_DASHBOARD');
-          }
+        setUser(currentUser);
+        
+        const path = window.location.pathname.replace(/\/$/, '');
+        if (currentUser && path === '/enterprise_bistro_almeidas_admin') {
+          setCurrentView('ADMIN_DASHBOARD');
+        }
       });
       return () => unsubscribe();
     } catch (error) {
       console.error("Erro na autenticação:", error);
+      setIsMenuLoading(false);
+      setIsSettingsLoading(false);
     }
   }, []);
 
@@ -59,7 +64,12 @@ const App = () => {
     if (!db) {
       const savedSettings = localStorage.getItem('almeidas_settings');
       if (savedSettings) {
-        setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(savedSettings) });
+        try {
+          setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(savedSettings) });
+        } catch (e) {
+          console.error("Erro ao carregar settings do localStorage:", e);
+          setSettings(DEFAULT_SETTINGS);
+        }
       }
       setIsSettingsLoading(false);
       return;
@@ -68,7 +78,8 @@ const App = () => {
     const settingsRef = doc(db, 'storeSettings', 'config');
     const unsubscribe = onSnapshot(settingsRef, (docSnap) => {
       if (docSnap.exists()) {
-        setSettings({ ...DEFAULT_SETTINGS, ...docSnap.data() as StoreSettings });
+        const firestoreSettings = docSnap.data() as Partial<StoreSettings>;
+        setSettings({ ...DEFAULT_SETTINGS, ...firestoreSettings });
       }
       setIsSettingsLoading(false);
     }, (error) => {
@@ -79,38 +90,59 @@ const App = () => {
     return () => unsubscribe();
   }, []);
 
-  // 3. Handle Firestore Realtime Products with Fallback
+  // 3. Handle Firestore Realtime Products with Fallback - ATUALIZADO
   useEffect(() => {
     if (!db) {
       console.log("Modo Demo: Carregando menu inicial.");
-      setProducts(INITIAL_MENU);
+      // GARANTIR que INITIAL_MENU tenha image como string
+      const validatedMenu = INITIAL_MENU.map(product => ({
+        ...product,
+        image: typeof product.image === 'string' ? product.image : 'https://placehold.co/200x200/eee/999?text=Produto'
+      }));
+      setProducts(validatedMenu);
       setIsMenuLoading(false);
       return;
     }
 
     try {
       const unsubscribe = onSnapshot(collection(db, 'menuItems'), (snapshot) => {
-          const loadedProducts: Product[] = snapshot.docs.map(doc => ({
+          const loadedProducts: Product[] = snapshot.docs.map(doc => {
+            const data = doc.data();
+            // CONVERSÃO: garantir que image seja sempre string
+            return {
               id: doc.id,
-              ...doc.data()
-          } as Product));
+              name: data.name || '',
+              description: data.description || '',
+              price: data.price || 0,
+              image: typeof data.image === 'string' ? data.image : 
+                     (data.image?.url || 'https://placehold.co/200x200/eee/999?text=Produto'),
+              order: data.order || 0
+            } as Product;
+          });
           
           setProducts(loadedProducts);
           setIsMenuLoading(false);
       }, (error) => {
           console.warn("Erro ao conectar com Firestore, usando fallback:", error);
-          setProducts(INITIAL_MENU);
+          const validatedMenu = INITIAL_MENU.map(product => ({
+            ...product,
+            image: typeof product.image === 'string' ? product.image : 'https://placehold.co/200x200/eee/999?text=Produto'
+          }));
+          setProducts(validatedMenu);
           setIsMenuLoading(false);
       });
 
       return () => unsubscribe();
     } catch (error) {
       console.warn("Erro crítico Firestore, usando fallback:", error);
-      setProducts(INITIAL_MENU);
+      const validatedMenu = INITIAL_MENU.map(product => ({
+        ...product,
+        image: typeof product.image === 'string' ? product.image : 'https://placehold.co/200x200/eee/999?text=Produto'
+      }));
+      setProducts(validatedMenu);
       setIsMenuLoading(false);
     }
   }, []);
-
 
   // --- Handlers ---
 
@@ -140,46 +172,58 @@ const App = () => {
     window.history.pushState({}, '', '/');
   };
 
-  // --- Firestore CRUD (Com Fallback) ---
+  // --- Firestore CRUD (Com Fallback) - ATUALIZADOS ---
 
   const handleAddProduct = async (product: Omit<Product, 'id'>) => {
     if (!db) {
+      // Modo Demo - GARANTIR que image seja string
       const newId = Math.random().toString(36).substr(2, 9);
-      const newProduct = { ...product, id: newId };
+      const newProduct = { 
+        ...product, 
+        id: newId,
+        order: products.length + 1
+      };
       setProducts(prev => [...prev, newProduct]);
       return;
     }
+    
     try {
       await addDoc(collection(db, 'menuItems'), product);
     } catch (e) {
+      console.error("Erro ao salvar produto:", e);
       alert("Erro ao salvar: Verifique a configuração do Firebase.");
     }
   };
 
   const handleEditProduct = async (id: string, product: Partial<Product>) => {
     if (!db) {
+      // Modo Demo
       setProducts(prev => prev.map(p => p.id === id ? { ...p, ...product } : p));
       return;
     }
+    
     try {
       const productRef = doc(db, 'menuItems', id);
       await updateDoc(productRef, product);
     } catch (e) {
+      console.error("Erro ao editar produto:", e);
       alert("Erro ao editar: Verifique a configuração do Firebase.");
     }
   };
 
   const handleDeleteProduct = async (id: string) => {
     if (!db) {
-       if (window.confirm('Tem certeza que deseja excluir este produto? (Modo Teste)')) {
-          setProducts(prev => prev.filter(p => p.id !== id));
-       }
-       return;
+      if (window.confirm('Tem certeza que deseja excluir este produto? (Modo Teste)')) {
+        setProducts(prev => prev.filter(p => p.id !== id));
+      }
+      return;
     }
+    
     if (window.confirm('Tem certeza que deseja excluir este produto?')) {
       try {
         await deleteDoc(doc(db, 'menuItems', id));
       } catch (e) {
+        console.error("Erro ao excluir produto:", e);
         alert("Erro ao excluir: Verifique a configuração do Firebase.");
       }
     }

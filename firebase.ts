@@ -1,9 +1,7 @@
-// @ts-ignore
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-// 🆕 1. Importar o Storage
-import { getStorage } from "firebase/storage"; 
+import { getStorage } from 'firebase/storage';
 
 // Configurações do seu projeto Firebase usando variáveis de ambiente
 const firebaseConfig = {
@@ -16,23 +14,21 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
+// Inicializa o Firebase apenas se as configurações existirem
 let app = null;
 let auth = null;
 let db = null;
-// 🆕 2. Declarar a variável para o Storage
-let storage = null; 
+let storage = null;
 
-// Verifica se a configuração existe antes de tentar inicializar
 if (firebaseConfig.apiKey && firebaseConfig.projectId) {
   try {
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
     db = getFirestore(app);
-    // 🆕 3. Inicializar o Storage
-    storage = getStorage(app); 
-    console.log("Firebase conectado com sucesso.");
+    storage = getStorage(app); // ← STORAGE ADICIONADO AQUI
+    console.log("✅ Firebase conectado com sucesso - Auth, Firestore e Storage");
   } catch (error) {
-    console.error("Erro ao inicializar Firebase:", error);
+    console.error("❌ Erro ao inicializar Firebase:", error);
     console.warn("O site rodará em modo offline/demo.");
   }
 } else {
@@ -41,6 +37,5 @@ if (firebaseConfig.apiKey && firebaseConfig.projectId) {
   console.warn("O site rodará em modo offline/demo por enquanto.");
 }
 
-// 🆕 4. Exportar o Storage junto com Auth e DB
-export { auth, db, storage };
-export const storage = getStorage(app);
+// Exportações
+export { app, auth, db, storage };
