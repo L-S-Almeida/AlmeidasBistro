@@ -94,25 +94,12 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ products, settings, 
   };
 
   // Cálculos CORRIGIDOS
-  // Cálculos CORRIGIDOS
   const cartSubtotal = useMemo(() => {
     return cart.reduce((total, item) => total + (item.price * item.quantity), 0);
   }, [cart]);
 
   const deliveryFee = Number(settings.deliveryFee || 0);
   const cartTotal = cartSubtotal + deliveryFee;
-
-  // NOVO: Calcular subtotal das quantidades na lista
-  const listSubtotal = useMemo(() => {
-    return Object.entries(productQuantities).reduce((total, [productId, quantity]) => {
-      const product = products.find(p => p.id === productId);
-      return total + (product ? product.price * quantity : 0);
-    }, 0);
-  }, [productQuantities, products]);
-
-  // NOVO: Total combinado (carrinho + lista)
-  const combinedSubtotal = cartSubtotal + listSubtotal;
-  const combinedTotal = combinedSubtotal + deliveryFee;
   const cartItemCount = cart.reduce((acc, item) => acc + item.quantity, 0);
 
   // CORREÇÃO: Calcular total de quantidades na lista
@@ -336,10 +323,10 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ products, settings, 
                       
                       <div className="flex justify-between items-center mt-auto">
                         <span className="font-black text-lg text-[#D93F3E]">R$ {Number(product.price).toFixed(2).replace('.', ',')}</span>
-                        {/* BOTÕES DE QUANTIDADE - MELHORADO */}
+                        
+                        {/* BOTÕES DE QUANTIDADE - CORRIGIDOS */}
                         <div className="flex items-center gap-2">
-                          {quantity > 0 ? (
-                            // SE TEM QUANTIDADE > 0: Mostra os botões (- quantidade +)
+                          {quantity > 0 && (
                             <div className="flex items-center bg-gray-100 rounded-lg p-1">
                               <button 
                                 onClick={() => updateProductQuantity(product.id, -1)}
@@ -357,29 +344,21 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ products, settings, 
                                 <Plus size={14}/>
                               </button>
                             </div>
-                          ) : (
-                            // SE QUANTIDADE = 0: Mostra apenas o botão + original
-                            <button 
-                              onClick={() => updateProductQuantity(product.id, 1)}
-                              disabled={!settings.isOpen}
-                              className="w-10 h-10 flex items-center justify-center rounded-full shadow-md transition-all active:scale-90
-                                bg-gray-900 text-white hover:bg-[#D93F3E] disabled:bg-gray-200 disabled:text-gray-400"
-                            >
-                              <Plus size={20} />
-                            </button>
                           )}
                           
-                          {/* Botão da sacola (adicional) - APENAS quando tem quantidade */}
-                          {quantity > 0 && (
-                            <button 
-                              onClick={() => handleAddToCart(product)}
-                              disabled={!settings.isOpen}
-                              className="w-10 h-10 flex items-center justify-center rounded-full shadow-md transition-all active:scale-90
-                                bg-[#D93F3E] text-white hover:bg-red-700 disabled:bg-gray-200 disabled:text-gray-400"
-                            >
-                              <ShoppingBag size={16} />
-                            </button>
-                          )}
+                          {/* BOTÃO CORRIGIDO: Usa função específica */}
+                          <button 
+                            onClick={() => handleAddToCart(product)}
+                            disabled={!settings.isOpen}
+                            className={`w-10 h-10 flex items-center justify-center rounded-full shadow-md transition-all active:scale-90
+                              ${settings.isOpen 
+                                ? quantity > 0 
+                                  ? 'bg-[#D93F3E] text-white hover:bg-red-700' 
+                                  : 'bg-gray-900 text-white hover:bg-[#D93F3E]'
+                                : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+                          >
+                            {quantity > 0 ? <ShoppingBag size={16} /> : <Plus size={20} />}
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -413,7 +392,7 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ products, settings, 
                     </div>
                     <div className="flex flex-col items-start leading-none">
                         <span className="text-[10px] font-normal opacity-80 uppercase tracking-wide">Total</span>
-                        <span className="text-lg">R$ {combinedTotal.toFixed(2)}</span>
+                        <span className="text-lg">R$ {cartTotal.toFixed(2)}</span>
                     </div>
                 </div>
                 <span className="flex items-center gap-2 text-sm bg-red-800/30 px-3 py-1.5 rounded-full">
@@ -440,7 +419,7 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ products, settings, 
 
                 {/* Scrollable Content */}
                 <div className="flex-grow overflow-y-auto p-5 space-y-6">
-                    {cart.length === 0 && totalQuantitiesInList === 0 ? (
+                    {cart.length === 0 ? (
                         <div className="text-center text-gray-400 mt-20">
                             <ShoppingBag size={64} className="mx-auto mb-4 opacity-20" />
                             <p>Seu carrinho está vazio.</p>
@@ -492,62 +471,6 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ products, settings, 
                                     </div>
                                 ))}
                             </div>
-
-                            {/* NOVO: Itens da Lista (ainda não adicionados ao carrinho) */}
-                            {totalQuantitiesInList > 0 && (
-                              <div className="space-y-4">
-                                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                  <AlertCircle size={14} />
-                                  Itens na Lista (Não Adicionados)
-                                </h3>
-                                {Object.entries(productQuantities).map(([productId, quantity]) => {
-                                  const product = products.find(p => p.id === productId);
-                                  if (!product) return null;
-                                  
-                                  return (
-                                    <div key={productId} className="flex gap-4 items-center bg-yellow-50 border border-yellow-200 p-3 rounded-xl shadow-sm">
-                                      <div className="w-16 h-16 bg-gray-50 rounded-lg overflow-hidden flex-shrink-0">
-                                        <img 
-                                          src={product.image} 
-                                          className="w-full h-full object-cover" 
-                                          alt={product.name}
-                                          onError={(e) => {
-                                            const target = e.target as HTMLImageElement;
-                                            target.style.display = 'none';
-                                          }}
-                                        />
-                                        <div 
-                                          className={`w-full h-full flex items-center justify-center ${getProductColor(product.name)} text-white font-bold text-sm`}
-                                          style={{ display: isValidImage(product.image) ? 'none' : 'flex' }}
-                                        >
-                                          {getProductInitials(product.name)}
-                                        </div>
-                                      </div>
-                                      <div className="flex-grow min-w-0">
-                                        <h4 className="font-bold text-gray-800 text-sm line-clamp-1">{product.name}</h4>
-                                        <p className="text-[#D93F3E] font-bold text-sm mt-1">R$ {(product.price * quantity).toFixed(2)}</p>
-                                        <p className="text-xs text-yellow-600 mt-1">⚠️ Clique na sacola para adicionar ao pedido</p>
-                                      </div>
-                                      <div className="flex items-center bg-yellow-100 rounded-lg p-1">
-                                        <button 
-                                          onClick={() => updateProductQuantity(productId, -1)} 
-                                          className="w-7 h-7 flex items-center justify-center text-yellow-700 hover:bg-yellow-200 hover:shadow-sm rounded-md transition"
-                                        >
-                                          {quantity === 1 ? <Trash2 size={14}/> : <Minus size={14}/>}
-                                        </button>
-                                        <span className="text-sm font-bold w-6 text-center">{quantity}</span>
-                                        <button 
-                                          onClick={() => updateProductQuantity(productId, 1)} 
-                                          className="w-7 h-7 flex items-center justify-center text-yellow-700 hover:bg-yellow-200 hover:shadow-sm rounded-md transition"
-                                        >
-                                          <Plus size={14}/>
-                                        </button>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
 
                             <hr className="border-dashed border-gray-200" />
 
@@ -649,24 +572,18 @@ export const CustomerView: React.FC<CustomerViewProps> = ({ products, settings, 
                 {cart.length > 0 && (
                     <div className="p-5 bg-white border-t border-gray-100 shadow-[0_-4px_10px_-2px_rgba(0,0,0,0.05)] z-10">
                         <div className="space-y-1 mb-4 text-sm">
-                          <div className="flex justify-between text-gray-500">
-                            <span>Subtotal do Carrinho</span>
-                            <span>R$ {cartSubtotal.toFixed(2)}</span>
-                          </div>
-                          {totalQuantitiesInList > 0 && (
-                            <div className="flex justify-between text-yellow-600">
-                              <span>Itens na Lista</span>
-                              <span>R$ {listSubtotal.toFixed(2)}</span>
+                            <div className="flex justify-between text-gray-500">
+                                <span>Subtotal</span>
+                                <span>R$ {cartSubtotal.toFixed(2)}</span>
                             </div>
-                          )}
-                          <div className="flex justify-between text-gray-500">
-                            <span>Taxa de Entrega</span>
-                            <span>{deliveryFee === 0 ? 'A calcular' : `R$ ${deliveryFee.toFixed(2)}`}</span>
-                          </div>
-                          <div className="flex justify-between font-black text-xl text-gray-800 pt-2 border-t border-dashed border-gray-200 mt-2">
-                            <span>Total</span>
-                            <span>R$ {combinedTotal.toFixed(2)}</span>
-                          </div>
+                            <div className="flex justify-between text-gray-500">
+                                <span>Taxa de Entrega</span>
+                                <span>{deliveryFee === 0 ? 'A calcular' : `R$ ${deliveryFee.toFixed(2)}`}</span>
+                            </div>
+                            <div className="flex justify-between font-black text-xl text-gray-800 pt-2 border-t border-dashed border-gray-200 mt-2">
+                                <span>Total</span>
+                                <span>R$ {cartTotal.toFixed(2)}</span>
+                            </div>
                         </div>
                         
                         <button 
