@@ -461,7 +461,7 @@ export const CustomerView: React.FC<{ products: Product[]; settings: StoreSettin
             onClick={onOpenAdmin}
             className="text-gray-300 hover:text-[#D93F3E] text-xs flex items-center justify-center gap-1 mx-auto transition-colors"
           >
-            <Lock size={12} /> Acesso Administrativo
+            {/*<Lock size={12} /> Acesso Administrativo*/}
           </button>
       </div>
 
